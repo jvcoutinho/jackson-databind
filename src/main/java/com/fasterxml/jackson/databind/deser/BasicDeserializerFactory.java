@@ -1381,6 +1381,7 @@ nonAnnotatedParamIndex, ctor);
         return null;
     }
 
+    
     // Copied almost verbatim from "createMapDeserializer" -- should try to share more code
     @Override
     public JsonDeserializer<?> createMapLikeDeserializer(DeserializationContext ctxt,
@@ -1517,7 +1518,7 @@ nonAnnotatedParamIndex, ctor);
                 ValueInstantiator inst = type.hasRawClass(Optional.class) ? null
                         : findValueInstantiator(ctxt, beanDesc);
                 return new Jdk8OptionalDeserializer(type, inst, contentTypeDeser, contentDeser);
-            }
+                }
             if (type.isTypeOrSubTypeOf(AtomicReference.class)) {
                 // 23-Oct-2016, tatu: Note that subtypes are probably not supportable
                 //    without either forcing merging (to avoid having to create instance)
@@ -1578,7 +1579,11 @@ nonAnnotatedParamIndex, ctor);
         BeanDescription beanDesc = null;
         KeyDeserializer deser = null;
         if (_factoryConfig.hasKeyDeserializers()) {
-            beanDesc = ctxt.introspectBeanDescription(type);
+<<<<<<< MINE
+            BeanDescription beanDesc = ctxt.introspectBeanDescription(type);
+=======
+            beanDesc = config.introspectClassAnnotations(type);
+>>>>>>> YOURS
             for (KeyDeserializers d  : _factoryConfig.keyDeserializers()) {
                 deser = d.findKeyDeserializer(type, config, beanDesc);
                 if (deser != null) {
@@ -1591,16 +1596,16 @@ nonAnnotatedParamIndex, ctor);
         if (deser == null) {
             // [databind#2452]: Support `@JsonDeserialize(keyUsing = ...)`
             if (beanDesc == null) {
-                beanDesc = ctxt.introspectBeanDescription(type);
+                beanDesc = config.introspectClassAnnotations(type.getRawClass());
             }
             deser = findKeyDeserializerFromAnnotation(ctxt, beanDesc.getClassInfo());
             if (deser == null) {
-                if (type.isEnumType()) {
-                    deser = _createEnumKeyDeserializer(ctxt, type);
-                } else {
-                    deser = StdKeyDeserializers.findStringBasedKeyDeserializer(ctxt, type);
-                }
+            if (type.isEnumType()) {
+                deser = _createEnumKeyDeserializer(ctxt, type);
+            } else {
+                deser = StdKeyDeserializers.findStringBasedKeyDeserializer(ctxt, type);
             }
+        }
         }
         // and then post-processing
         if (deser != null) {

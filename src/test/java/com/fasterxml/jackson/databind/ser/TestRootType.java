@@ -25,6 +25,13 @@ public class TestRootType
     /**********************************************************
      */
 
+
+    /*
+    /**********************************************************
+    /* Annotated helper classes
+    /**********************************************************
+     */
+
     interface BaseInterface {
         int getB();
     }
@@ -73,7 +80,10 @@ public class TestRootType
     final ObjectMapper WRAP_ROOT_MAPPER = jsonMapperBuilder()
             .enable(SerializationFeature.WRAP_ROOT_VALUE)
             .build();
-
+    {
+        WRAP_ROOT_MAPPER.configure(SerializationFeature.WRAP_ROOT_VALUE, true);
+    }
+    
     @SuppressWarnings("unchecked")
     public void testSuperClass() throws Exception
     {

@@ -106,17 +106,6 @@ public abstract class SerializerProvider
      */
     final protected SerializerFactory _serializerFactory;
     
-    /**
-     * Serializer used to output a null value. Default implementation
-     * writes nulls using {@link JsonGenerator#writeNull}.
-     */
-    final protected JsonSerializer<Object> _nullValueSerializer;
-
-    /**
-     * Flag set to indicate that we are using vanilla null value serialization
-     */
-    final protected boolean _stdNullValueSerializer;
-    
     /*
     /**********************************************************************
     /* Helper objects for caching, reuse
@@ -127,24 +116,6 @@ public abstract class SerializerProvider
      * Cache for doing type-to-value-serializer lookups.
      */
     final protected SerializerCache _serializerCache;
-    
-    /**
-     * For fast lookups, we will have a local non-shared read-only
-     * map that contains serializers previously fetched.
-     */
-    final protected ReadOnlyClassToSerializerMap _knownSerializers;
-
-    /**
-     * Lazily acquired and instantiated formatter object: initialized
-     * first time it is needed, reused afterwards. Used via instances
-     * (not blueprints), so that access need not be thread-safe.
-     */
-    protected DateFormat _dateFormat;
-
-    /**
-     * Lazily constructed {@link ClassIntrospector} instance: created from "blueprint"
-     */
-    protected transient ClassIntrospector _classIntrospector;
     
     /*
     /**********************************************************************
@@ -282,6 +253,35 @@ public abstract class SerializerProvider
         // 05-Oct-2017, tatu: Should probably optimize or something? Or not?
         writeValue(gen, tree);
     }
+    
+    /**
+     * Serializer used to output a null value. Default implementation
+     * writes nulls using {@link JsonGenerator#writeNull}.
+     */
+    final protected JsonSerializer<Object> _nullValueSerializer;
+    
+    /**
+     * For fast lookups, we will have a local non-shared read-only
+     * map that contains serializers previously fetched.
+     */
+    final protected ReadOnlyClassToSerializerMap _knownSerializers;
+
+    /**
+     * Lazily acquired and instantiated formatter object: initialized
+     * first time it is needed, reused afterwards. Used via instances
+     * (not blueprints), so that access need not be thread-safe.
+     */
+    protected DateFormat _dateFormat;
+
+    /**
+     * Lazily constructed {@link ClassIntrospector} instance: created from "blueprint"
+     */
+    protected transient ClassIntrospector _classIntrospector;
+
+    /**
+     * Flag set to indicate that we are using vanilla null value serialization
+     */
+    final protected boolean _stdNullValueSerializer;
 
     /*
     /**********************************************************************
@@ -573,73 +573,6 @@ public abstract class SerializerProvider
 
     /*
     /**********************************************************************
-    /* Serializer discovery: property value serializers
-    /**********************************************************************
-     */
-
-    /**
-     * Method used for locating "primary" property value serializer (one directly
-     * handling value of the property). Difference (if any) has to do with contextual resolution,
-     * and method(s) called: this method should only be called when caller is
-     * certain that this is the primary property value serializer.
-     * 
-     * @param property Property that is being handled; will never be null, and its
-     *    type has to match <code>valueType</code> parameter.
-     */
-    public JsonSerializer<Object> findPrimaryPropertySerializer(JavaType valueType,
-            BeanProperty property)
-        throws JsonMappingException
-    {
-        JsonSerializer<Object> ser = _knownSerializers.untypedValueSerializer(valueType);
-        if (ser == null) {
-            ser = _createAndCachePropertySerializer(valueType, property);
-        }
-        return handlePrimaryContextualization(ser, property);
-    }
-
-    public JsonSerializer<Object> findPrimaryPropertySerializer(Class<?> rawType,
-            BeanProperty property)
-        throws JsonMappingException
-    {
-        JsonSerializer<Object> ser = _knownSerializers.untypedValueSerializer(rawType);
-        if (ser == null) {
-            JavaType fullType = _config.constructType(rawType);
-            ser = _serializerCache.untypedValueSerializer(fullType);
-            if (ser == null) {
-                ser = _createAndCachePropertySerializer(rawType, fullType, property);
-            }
-        }
-        return handlePrimaryContextualization(ser, property);
-    }
-
-    public JsonSerializer<Object> findSecondaryPropertySerializer(JavaType valueType,
-            BeanProperty property)
-        throws JsonMappingException
-    {
-        JsonSerializer<Object> ser = _knownSerializers.untypedValueSerializer(valueType);
-        if (ser == null) {
-            ser = _createAndCachePropertySerializer(valueType, property);
-        }
-        return handleSecondaryContextualization(ser, property);
-    }
-
-    public JsonSerializer<Object> findSecondaryPropertySerializer(Class<?> rawType,
-            BeanProperty property)
-        throws JsonMappingException
-    {
-        JsonSerializer<Object> ser = _knownSerializers.untypedValueSerializer(rawType);
-        if (ser == null) {
-            JavaType fullType = _config.constructType(rawType);
-            ser = _serializerCache.untypedValueSerializer(fullType);
-            if (ser == null) {
-                ser = _createAndCachePropertySerializer(rawType, fullType, property);
-            }
-        }
-        return handleSecondaryContextualization(ser, property);
-    }
-
-    /*
-    /**********************************************************************
     /* General serializer locating functionality
     /**********************************************************************
      */
@@ -673,9 +606,76 @@ public abstract class SerializerProvider
         // (see comments from above method)
         JsonSerializer<Object> ser = _knownSerializers.untypedValueSerializer(valueType);
         if (ser == null) {
-            ser = _createAndCacheUntypedSerializer(valueType);
+                ser = _createAndCacheUntypedSerializer(valueType);
         }
         return ser;
+    }
+
+    /*
+    /**********************************************************************
+    /* Serializer discovery: property value serializers
+    /**********************************************************************
+     */
+
+    /**
+     * Method used for locating "primary" property value serializer (one directly
+     * handling value of the property). Difference (if any) has to do with contextual resolution,
+     * and method(s) called: this method should only be called when caller is
+     * certain that this is the primary property value serializer.
+     * 
+     * @param property Property that is being handled; will never be null, and its
+     *    type has to match <code>valueType</code> parameter.
+     */
+    public JsonSerializer<Object> findPrimaryPropertySerializer(JavaType valueType,
+            BeanProperty property)
+        throws JsonMappingException
+    {
+        JsonSerializer<Object> ser = _knownSerializers.untypedValueSerializer(valueType);
+        if (ser == null) {
+            ser = _createAndCachePropertySerializer(valueType, property);
+                    }
+        return handlePrimaryContextualization(ser, property);
+    }
+
+    public JsonSerializer<Object> findPrimaryPropertySerializer(Class<?> rawType,
+            BeanProperty property)
+        throws JsonMappingException
+    {
+        JsonSerializer<Object> ser = _knownSerializers.untypedValueSerializer(rawType);
+        if (ser == null) {
+            JavaType fullType = _config.constructType(rawType);
+            ser = _serializerCache.untypedValueSerializer(fullType);
+            if (ser == null) {
+                ser = _createAndCachePropertySerializer(rawType, fullType, property);
+                    }
+                }
+        return handlePrimaryContextualization(ser, property);
+    }
+
+    public JsonSerializer<Object> findSecondaryPropertySerializer(JavaType valueType,
+            BeanProperty property)
+        throws JsonMappingException
+    {
+        JsonSerializer<Object> ser = _knownSerializers.untypedValueSerializer(valueType);
+        if (ser == null) {
+            ser = _createAndCachePropertySerializer(valueType, property);
+        }
+        return handleSecondaryContextualization(ser, property);
+    }
+
+    public JsonSerializer<Object> findSecondaryPropertySerializer(Class<?> rawType,
+            BeanProperty property)
+        throws JsonMappingException
+    {
+        JsonSerializer<Object> ser = _knownSerializers.untypedValueSerializer(rawType);
+        if (ser == null) {
+            JavaType fullType = _config.constructType(rawType);
+            ser = _serializerCache.untypedValueSerializer(fullType);
+            if (ser == null) {
+                ser = _createAndCachePropertySerializer(rawType, fullType, property);
+            }
+        }
+        return handleSecondaryContextualization(ser, property);
     }
 
     /*
@@ -745,12 +745,18 @@ public abstract class SerializerProvider
     public JsonSerializer<Object> findKeySerializer(JavaType keyType, BeanProperty property)
         throws JsonMappingException
     {
+<<<<<<< MINE
         // 16-Mar-2018, tatu: Used to have "default key serializer" in 2.x; dropped to let/make
         //    custom code use Module interface or similar to provide key serializers
         JsonSerializer<Object> ser = _serializerFactory.createKeySerializer(this, keyType, null);
         // _handleContextualResolvable(ser, property):
         ser.resolve(this);
         return handleSecondaryContextualization(ser, property);
+=======
+        JsonSerializer<Object> ser = _serializerFactory.createKeySerializer(this, keyType, _keySerializer);
+        // 25-Feb-2011, tatu: As per [JACKSON-519], need to ensure contextuality works here, too
+        return _handleContextualResolvable(ser, property);
+>>>>>>> YOURS
     }
 
     public JsonSerializer<Object> findKeySerializer(Class<?> rawKeyType, BeanProperty property)
@@ -866,96 +872,6 @@ public abstract class SerializerProvider
         return ser;
     }
 
-    protected JsonSerializer<Object> _createAndCacheUntypedSerializer(JavaType type)
-        throws JsonMappingException
-    {
-        // Important: must introspect all annotations, not just class
-        BeanDescription beanDesc = introspectBeanDescription(type);
-        JsonSerializer<Object> ser;
-        try {
-            ser = _serializerFactory.createSerializer(this, type, beanDesc, null);
-        } catch (IllegalArgumentException iae) {
-            // We better only expose checked exceptions, since those are what caller is expected to handle
-            throw _mappingProblem(iae, ClassUtil.exceptionMessage(iae));
-        }
-        // always cache -- but only full type (may be parameterized)
-        _serializerCache.addAndResolveNonTypedSerializer(type, ser, this);
-        return ser;
-    }
-
-    /**
-     * Alternative to {@link #_createAndCacheUntypedSerializer(Class, JavaType)}, used
-     * when serializer is requested for given property.
-     */
-    protected JsonSerializer<Object> _createAndCachePropertySerializer(Class<?> rawType,
-            JavaType fullType, BeanProperty prop)
-        throws JsonMappingException
-    {
-        BeanDescription beanDesc = introspectBeanDescription(fullType);
-        JsonSerializer<Object> ser;
-        try {
-            ser = _serializerFactory.createSerializer(this, fullType, beanDesc, null);
-        } catch (IllegalArgumentException iae) {
-            throw _mappingProblem(iae, ClassUtil.exceptionMessage(iae));
-        }
-        _serializerCache.addAndResolveNonTypedSerializer(rawType, fullType, ser, this);
-        // Fine, we have to base instance. But how about per-property format overrides?
-        if (prop == null) {
-            return ser;
-        }
-        return _checkShapeShifting(fullType, beanDesc, prop, ser);
-    }
-
-    /**
-     * Alternative to {@link #_createAndCacheUntypedSerializer(JavaType)}, used
-     * when serializer is requested for given property.
-     */
-    protected JsonSerializer<Object> _createAndCachePropertySerializer(JavaType type,
-            BeanProperty prop)
-        throws JsonMappingException
-    {
-        BeanDescription beanDesc = introspectBeanDescription(type);
-        JsonSerializer<Object> ser;
-        try {
-            ser = _serializerFactory.createSerializer(this, type, beanDesc, null);
-        } catch (IllegalArgumentException iae) {
-            throw _mappingProblem(iae, ClassUtil.exceptionMessage(iae));
-        }
-        _serializerCache.addAndResolveNonTypedSerializer(type, ser, this);
-        // Fine, we have to base instance. But how about per-property format overrides?
-        if (prop == null) {
-            return ser;
-        }
-        return _checkShapeShifting(type, beanDesc, prop, ser);
-    }
-
-    @SuppressWarnings("unchecked")
-    private JsonSerializer<Object> _checkShapeShifting(JavaType type, BeanDescription beanDesc,
-            BeanProperty prop, JsonSerializer<?> ser)
-        throws JsonMappingException
-    {
-        JsonFormat.Value overrides = prop.findFormatOverrides(_config);
-        if (overrides != null) {
-            // First: it may be completely fine to use serializer, despite some overrides
-            JsonSerializer<?> ser2 = ser.withFormatOverrides(_config, overrides);
-            if (ser2 != null) {
-                ser = ser2;
-            } else {
-                // But if not, we need to re-create it via factory
-                ser = _serializerFactory.createSerializer(this, type, beanDesc, overrides);
-            }
-        }
-        return (JsonSerializer<Object>) ser;
-    }
-
-    @SuppressWarnings("unchecked")
-    protected JsonSerializer<Object> _handleResolvable(JsonSerializer<?> ser)
-        throws JsonMappingException
-    {
-        ser.resolve(this);
-        return (JsonSerializer<Object>) ser;
-    }
-
     /*
     /**********************************************************************
     /* Methods for creating instances based on annotations
@@ -1016,7 +932,7 @@ public abstract class SerializerProvider
     {
         if (ser != null) {
             ser = ser.createContextual(this, property);
-        }
+            }
         return (JsonSerializer<Object>) ser;
     }
 
@@ -1041,7 +957,7 @@ public abstract class SerializerProvider
     {
         if (ser != null) {
             ser = ser.createContextual(this, property);
-        }
+            }
         return (JsonSerializer<Object>) ser;
     }
 
@@ -1077,7 +993,7 @@ public abstract class SerializerProvider
     public final void defaultSerializeValue(Object value, JsonGenerator gen) throws IOException {
         writeValue(gen, value);
     }
-
+    
     /**
      * Convenience method that will serialize given field with specified
      * value. Value may be null. Serializer is done using the usual
@@ -1166,6 +1082,15 @@ public abstract class SerializerProvider
             _nullValueSerializer.serialize(null, gen, this);
         }
     }
+    
+    /**
+     * Helper method called to indicate problem; default behavior is to construct and
+     * throw a {@link JsonMappingException}, but in future may collect more than one
+     * and only throw after certain number, or at the end of serialization.
+     */
+    public void reportMappingProblem(String message, Object... msgArgs) throws JsonMappingException {
+        throw JsonMappingException.from(getGenerator(), _format(message, msgArgs));
+    }
 
     /*
     /**********************************************************************
@@ -1248,15 +1173,6 @@ public abstract class SerializerProvider
     protected JsonMappingException _mappingProblem(Throwable t, String message, Object... msgArgs) {
         return JsonMappingException.from(getGenerator(), _format(message, msgArgs), t);
     }
-    
-    /**
-     * Helper method called to indicate problem; default behavior is to construct and
-     * throw a {@link JsonMappingException}, but in future may collect more than one
-     * and only throw after certain number, or at the end of serialization.
-     */
-    public void reportMappingProblem(String message, Object... msgArgs) throws JsonMappingException {
-        throw JsonMappingException.from(getGenerator(), _format(message, msgArgs));
-    }
 
     @Override
     public JsonMappingException invalidTypeIdException(JavaType baseType, String typeId,
@@ -1279,6 +1195,96 @@ public abstract class SerializerProvider
         reportBadDefinition(rootType, String.format(
                 "Incompatible types: declared root type (%s) vs %s",
                 rootType, ClassUtil.classNameOf(value)));
+    }
+
+    protected JsonSerializer<Object> _createAndCacheUntypedSerializer(JavaType type)
+        throws JsonMappingException
+    {        
+        // Important: must introspect all annotations, not just class
+        BeanDescription beanDesc = introspectBeanDescription(type);
+        JsonSerializer<Object> ser;
+        try {
+            ser = _serializerFactory.createSerializer(this, type, beanDesc, null);
+        } catch (IllegalArgumentException iae) {
+            // We better only expose checked exceptions, since those are what caller is expected to handle
+            throw _mappingProblem(iae, ClassUtil.exceptionMessage(iae));
+        }
+        // always cache -- but only full type (may be parameterized)
+            _serializerCache.addAndResolveNonTypedSerializer(type, ser, this);
+        return ser;
+    }
+
+    /**
+     * Alternative to {@link #_createAndCacheUntypedSerializer(Class, JavaType)}, used
+     * when serializer is requested for given property.
+     */
+    protected JsonSerializer<Object> _createAndCachePropertySerializer(Class<?> rawType,
+            JavaType fullType, BeanProperty prop)
+        throws JsonMappingException
+    {
+        BeanDescription beanDesc = introspectBeanDescription(fullType);
+        JsonSerializer<Object> ser;
+        try {
+            ser = _serializerFactory.createSerializer(this, fullType, beanDesc, null);
+        } catch (IllegalArgumentException iae) {
+            throw _mappingProblem(iae, ClassUtil.exceptionMessage(iae));
+        }
+        _serializerCache.addAndResolveNonTypedSerializer(rawType, fullType, ser, this);
+        // Fine, we have to base instance. But how about per-property format overrides?
+        if (prop == null) {
+            return ser;
+        }
+        return _checkShapeShifting(fullType, beanDesc, prop, ser);
+    }
+
+    /**
+     * Alternative to {@link #_createAndCacheUntypedSerializer(JavaType)}, used
+     * when serializer is requested for given property.
+     */
+    protected JsonSerializer<Object> _createAndCachePropertySerializer(JavaType type,
+            BeanProperty prop)
+        throws JsonMappingException
+    {
+        BeanDescription beanDesc = introspectBeanDescription(type);
+        JsonSerializer<Object> ser;
+        try {
+            ser = _serializerFactory.createSerializer(this, type, beanDesc, null);
+        } catch (IllegalArgumentException iae) {
+            throw _mappingProblem(iae, ClassUtil.exceptionMessage(iae));
+        }
+        _serializerCache.addAndResolveNonTypedSerializer(type, ser, this);
+        // Fine, we have to base instance. But how about per-property format overrides?
+        if (prop == null) {
+            return ser;
+        }
+        return _checkShapeShifting(type, beanDesc, prop, ser);
+    }
+
+    @SuppressWarnings("unchecked")
+    private JsonSerializer<Object> _checkShapeShifting(JavaType type, BeanDescription beanDesc,
+            BeanProperty prop, JsonSerializer<?> ser)
+        throws JsonMappingException
+    {
+        JsonFormat.Value overrides = prop.findFormatOverrides(_config);
+        if (overrides != null) {
+            // First: it may be completely fine to use serializer, despite some overrides
+            JsonSerializer<?> ser2 = ser.withFormatOverrides(_config, overrides);
+            if (ser2 != null) {
+                ser = ser2;
+            } else {
+                // But if not, we need to re-create it via factory
+                ser = _serializerFactory.createSerializer(this, type, beanDesc, overrides);
+            }
+        }
+        return (JsonSerializer<Object>) ser;
+    }
+
+    @SuppressWarnings("unchecked")
+    protected JsonSerializer<Object> _handleResolvable(JsonSerializer<?> ser)
+        throws JsonMappingException
+    {
+        ser.resolve(this);
+        return (JsonSerializer<Object>) ser;
     }
 
     /*
